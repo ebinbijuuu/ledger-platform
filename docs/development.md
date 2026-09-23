@@ -5,7 +5,7 @@
 The following software is required:
 
 - Git
-- Java 21 or later
+- Java 25 or later
 - Maven
 - Node.js
 - npm
