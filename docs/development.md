@@ -6,7 +6,6 @@ The following software is required:
 
 - Git
 - Java 21 or later
-- Maven
 - Node.js
 - npm
 - Docker
@@ -61,6 +60,8 @@ Navigate to the backend:
 ```bash
 cd backend
 ```
+
+The Maven Wrapper is included, so a global Maven installation is not required.
 
 Start the Spring Boot application using Maven:
 
