@@ -79,7 +79,7 @@ The exact response structures will be defined as individual endpoints are implem
 
 ## 7. Error Responses
 
-API errors should use a consistent structure.
+All API errors use the following JSON structure:
 
 Example:
 
@@ -88,12 +88,30 @@ Example:
   "timestamp": "2026-01-01T12:00:00Z",
   "status": 400,
   "error": "Bad Request",
-  "message": "Invalid request",
-  "path": "/api/v1/accounts"
+  "message": "Request validation failed",
+  "path": "/api/v1/accounts",
+  "fieldErrors": {
+    "name": "must not be blank"
+  }
 }
 ```
 
-The final error model may evolve as the API develops.
+`timestamp` is an ISO-8601 UTC instant. `status` and `error` contain the HTTP
+status code and reason phrase. `message` is a client-safe summary, `path` is
+the request path, and `fieldErrors` maps invalid field names to validation
+messages. `fieldErrors` is an empty object when an error does not concern
+individual fields.
+
+The backend returns `400 Bad Request` for bean-validation failures and missing
+or malformed request bodies, `404 Not Found` for a missing resource,
+`409 Conflict` for a resource or operation conflict, and `500 Internal Server
+Error` for unexpected failures. Expected application errors should use the
+`ApiException` hierarchy (`BadRequestException`, `ResourceNotFoundException`,
+or `ConflictException`) with a message that is safe to show to clients.
+
+Error responses never include stack traces or exception and SQL details.
+Unexpected errors use a fixed generic message, and internal exception messages
+must not be returned to API clients.
 
 ## 8. Validation
 
