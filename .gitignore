@@ -25,3 +25,8 @@ replay_pid*
 
 # IntelliJ IDEA
 .idea/
+
+# Local environment overrides (keep the example file tracked)
+.env
+.env.*
+!.env.example
