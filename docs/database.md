@@ -271,3 +271,62 @@ The application must ensure:
 - Invalid account relationships cannot be created
 - Duplicate financial operations are prevented
 - Financial records are not silently overwritten
+
+## 11. Local PostgreSQL & Flyway Setup
+
+### Starting PostgreSQL
+
+The local development database runs via Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+This starts a PostgreSQL 17 container (`ledger-postgres`) with these defaults:
+
+| Setting  | Value    |
+|----------|----------|
+| Database | `ledger` |
+| Username | `ledger` |
+| Password | `ledger` |
+| Port     | `5432`   |
+
+These map to the `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` environment variables in `backend/src/main/resources/application.properties`, and can be overridden without code changes.
+
+### Verifying the Connection
+
+Start the backend:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Confirm the application started successfully via the health endpoint:
+
+```text
+GET /api/v1/health → {"status": "UP"}
+```
+
+Note: this only confirms the application booted — it does not verify the database connection. To confirm Spring Boot actually connected to PostgreSQL, check the startup logs for a successful Hibernate/HikariCP connection (no connection errors on boot), or confirm Flyway applied the migration by querying:
+
+```sql
+SELECT * FROM flyway_schema_history;
+```
+
+### Running Migrations
+
+Flyway runs automatically on backend startup and applies any pending migration files in:
+
+```text
+backend/src/main/resources/db/migration/
+```
+
+The initial migration, `V1__initial_schema.sql`, creates a `schema_test` table used to confirm Flyway is wired up correctly.
+
+To verify Flyway ran successfully, check its schema history table:
+
+```sql
+SELECT * FROM flyway_schema_history;
+```
+
+Hibernate is configured with `ddl-auto=validate` — it checks the schema against the entity model but never generates or alters tables itself. All schema changes must go through Flyway migrations.
