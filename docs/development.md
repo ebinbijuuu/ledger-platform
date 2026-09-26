@@ -218,3 +218,19 @@ Developers should:
 - Review each other's code
 - Update documentation when behaviour changes
 - Keep `main` in a working state
+
+## 13. Continuous Integration
+
+GitHub Actions runs CI automatically on:
+
+- Every pull request targeting `main`
+- Every push to `main`
+
+Two checks run:
+
+- **Backend CI** — sets up Java 21, then runs `./mvnw clean verify` from `backend/`.
+- **Frontend CI** — sets up Node (version pinned in `.nvmrc`), then runs `npm ci`, `npm run lint`, and `npm run build` from `frontend/`.
+
+Both checks are required — a pull request cannot be merged into `main` until both pass. Check the **Checks** tab on your PR to see build/test/lint output and diagnose failures.
+
+Frontend tests will be added to this pipeline once test coverage exists; there is currently no `test` script in `frontend/package.json`.
