@@ -301,10 +301,16 @@ Start the backend:
 ./mvnw spring-boot:run
 ```
 
-Confirm it connected successfully via the health endpoint:
+Confirm the application started successfully via the health endpoint:
 
 ```text
 GET /api/v1/health → {"status": "UP"}
+```
+
+Note: this only confirms the application booted — it does not verify the database connection. To confirm Spring Boot actually connected to PostgreSQL, check the startup logs for a successful Hibernate/HikariCP connection (no connection errors on boot), or confirm Flyway applied the migration by querying:
+
+```sql
+SELECT * FROM flyway_schema_history;
 ```
 
 ### Running Migrations
