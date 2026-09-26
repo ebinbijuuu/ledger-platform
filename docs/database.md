@@ -274,28 +274,35 @@ The application must ensure:
 
 ## 11. Local PostgreSQL & Flyway Setup
 
+### Environment settings
+
+Create a local `.env` file from `.env.example` in the repository root. This file is ignored by Git and holds local development overrides.
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Database | `DB_NAME` | `ledger` |
+| Username | `DB_USERNAME` | `ledger` |
+| Password | `DB_PASSWORD` | `ledger` |
+| Host | `DB_HOST` | `localhost` |
+| Port | `DB_PORT` | `5432` |
+| Full JDBC URL override | `DB_URL` | Built from host, port, and database |
+
+Docker Compose maps `DB_NAME`, `DB_USERNAME`, and `DB_PASSWORD` to the PostgreSQL image's `POSTGRES_*` variables. Spring Boot reads the same values from the root `.env` when launched from `backend`, or from environment variables supplied by the shell. Shell environment variables take precedence. Existing setups can continue to provide `DB_URL` to override the URL built from the host, port, and database values.
+
 ### Starting PostgreSQL
 
-The local development database runs via Docker Compose:
+From the repository root, start the PostgreSQL 17 container:
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
-This starts a PostgreSQL 17 container (`ledger-postgres`) with these defaults:
+The named `postgres_data` volume preserves database data when the container restarts.
+PostgreSQL applies `DB_NAME`, `DB_USERNAME`, and `DB_PASSWORD` when it first initializes this volume. If you change those values later, the existing database credentials do not change automatically.
 
-| Setting  | Value    |
-|----------|----------|
-| Database | `ledger` |
-| Username | `ledger` |
-| Password | `ledger` |
-| Port     | `5432`   |
+### Starting the backend
 
-These map to the `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` environment variables in `backend/src/main/resources/application.properties`, and can be overridden without code changes.
-
-### Verifying the Connection
-
-Start the backend:
+From the `backend` directory, run:
 
 ```bash
 ./mvnw spring-boot:run
@@ -307,7 +314,7 @@ Confirm the application started successfully via the health endpoint:
 GET /api/v1/health → {"status": "UP"}
 ```
 
-Note: this only confirms the application booted — it does not verify the database connection. To confirm Spring Boot actually connected to PostgreSQL, check the startup logs for a successful Hibernate/HikariCP connection (no connection errors on boot), or confirm Flyway applied the migration by querying:
+Note: this endpoint confirms the application booted; it does not check database health. Check the startup logs or query Flyway's history table to verify the database connection and migration status:
 
 ```sql
 SELECT * FROM flyway_schema_history;
@@ -330,3 +337,5 @@ SELECT * FROM flyway_schema_history;
 ```
 
 Hibernate is configured with `ddl-auto=validate` — it checks the schema against the entity model but never generates or alters tables itself. All schema changes must go through Flyway migrations.
+
+Restarting the application does not reapply a migration that Flyway has already recorded.

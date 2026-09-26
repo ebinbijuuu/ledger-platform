@@ -4,11 +4,11 @@ services:
     container_name: ledger-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ledger
-      POSTGRES_USER: ledger
-      POSTGRES_PASSWORD: ledger
+      POSTGRES_DB: ${DB_NAME:-ledger}
+      POSTGRES_USER: ${DB_USERNAME:-ledger}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ledger}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

@@ -29,19 +29,19 @@ cd ledger-platform
 
 ## 3. Environment Variables
 
-Copy the example environment file:
+Create your local environment file from the example in the repository root:
 
 ```bash
 cp .env.example .env
 ```
 
-Configure the required local environment variables.
+The example contains the shared PostgreSQL settings used by Docker Compose and Spring Boot. You can change these values in `.env`; Spring Boot reads it automatically when you start the backend from the `backend` directory.
 
-Do not commit `.env` or any file containing secrets.
+The committed `.env.example` contains development defaults only. Keep real credentials and local overrides in `.env`; Git ignores that file.
 
 ## 4. Start PostgreSQL
 
-Start the development database using Docker Compose:
+Start the development database from the repository root. Docker Compose reads `.env` automatically:
 
 ```bash
 docker compose up -d
@@ -63,7 +63,7 @@ cd backend
 
 The Maven Wrapper is included, so a global Maven installation is not required.
 
-Start the Spring Boot application using Maven:
+Start the Spring Boot application using Maven. Run this from the `backend` directory so it can load `../.env`:
 
 ```bash
 ./mvnw spring-boot:run
