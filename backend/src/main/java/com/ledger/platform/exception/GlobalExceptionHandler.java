@@ -12,8 +12,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 @RestControllerAdvice
@@ -50,13 +53,44 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ApiError> handleMethodValidation(
             HandlerMethodValidationException exception, HttpServletRequest request) {
-        return response(HttpStatus.BAD_REQUEST, "Request validation failed", request, Map.of());
+        Map<String, String> fieldErrors = new TreeMap<>();
+        exception.getAllValidationResults().forEach(result -> {
+            String parameter = result.getMethodParameter().getParameterName();
+            if (parameter == null) {
+                parameter = "arg" + result.getMethodParameter().getParameterIndex();
+            }
+            String key = parameter;
+            result.getResolvableErrors().forEach(error -> fieldErrors.putIfAbsent(
+                    key, error.getDefaultMessage() == null ? "Invalid value" : error.getDefaultMessage()));
+        });
+        return response(HttpStatus.BAD_REQUEST, "Request validation failed", request, fieldErrors);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleMalformedRequest(
             HttpMessageNotReadableException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Request body is missing or malformed", request, Map.of());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException exception, HttpServletRequest request) {
+        return response(HttpStatus.METHOD_NOT_ALLOWED,
+                "HTTP method is not supported for this endpoint", request, Map.of());
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "Content type is not supported", request, Map.of());
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParameter(
+            MissingServletRequestParameterException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "Required request parameter is missing", request,
+                Map.of(exception.getParameterName(), "Required parameter is missing"));
     }
 
     @ExceptionHandler(Exception.class)
