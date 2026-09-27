@@ -65,6 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
+
         } catch (Exception ignored) {
             // Invalid or expired JWTs are treated as unauthenticated requests.
         }

@@ -50,6 +50,7 @@ public class AuthService {
         }
     }
 
+
     public AuthResponse login(LoginRequest request) {
         String email = normalizeEmail(request.email());
 
