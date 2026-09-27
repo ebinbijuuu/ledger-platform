@@ -128,11 +128,75 @@ Validation responsibilities include:
 
 ## 9. Authentication
 
-Protected API endpoints will require authentication.
+Authentication uses stateless JWT bearer tokens issued by the backend.
 
-Authentication and authorisation will be implemented using Spring Security.
+### Register
 
-The final authentication mechanism will be documented when implemented.
+```text
+POST /api/v1/auth/register
+```
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "at-least-8-characters"
+}
+```
+
+Returns `201 Created` with no body on success, or `409 Conflict` if the email is already registered.
+
+### Login
+
+```text
+POST /api/v1/auth/login
+```
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "at-least-8-characters"
+}
+```
+
+Returns `200 OK`:
+
+```json
+{
+  "token": "<jwt>"
+}
+```
+
+Returns `401 Unauthorized` for an unknown email or incorrect password. Both cases return the same message and status, so a client cannot distinguish which one was wrong.
+
+### Using the token
+
+Include the issued JWT on subsequent requests:
+
+```text
+Authorization: Bearer <jwt>
+```
+
+### Public routes
+
+```text
+GET /api/v1/health
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+```
+
+All other `/api/v1/...` routes require a valid Bearer token.
+
+### Protected route example
+
+```text
+GET /api/v1/users/me
+```
+
+Returns the authenticated user's email, or `401 Unauthorized` if the token is missing, malformed, or invalid.
 
 ## 10. Financial Operations
 

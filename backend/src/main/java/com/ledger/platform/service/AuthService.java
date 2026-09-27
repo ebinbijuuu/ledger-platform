@@ -8,10 +8,10 @@ import com.ledger.platform.exception.ConflictException;
 import com.ledger.platform.repository.UserRepository;
 import com.ledger.platform.security.JwtService;
 import com.ledger.platform.exception.InvalidCredentialsException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 
 import java.util.Locale;
 
@@ -43,7 +43,11 @@ public class AuthService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
 
-        return userRepository.save(user);
+        try {
+            return userRepository.save(user);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("An account with this email already exists");
+        }
     }
 
     public AuthResponse login(LoginRequest request) {
