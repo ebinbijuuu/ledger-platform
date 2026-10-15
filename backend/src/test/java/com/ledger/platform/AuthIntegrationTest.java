@@ -37,6 +37,7 @@ class AuthIntegrationTest {
 
     private static final String EMAIL = "person@example.com";
     private static final String PASSWORD = "Password123";
+
     private static final String TEST_JWT_SECRET =
             "dGVzdC1qd3Qtc2VjcmV0LW11c3QtYmUtYXQtYmxvbmctMzItYnl0ZXMtbG9uZw==";
 
@@ -80,20 +81,30 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void registrationWithBlankEmailReturnsValidationError() throws Exception {
+    void registrationWithBlankEmailReturnsValidationError()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"\",\"password\":\"" + PASSWORD + "\"}"))
+                        .content(
+                                "{\"email\":\"\",\"password\":\""
+                                        + PASSWORD + "\"}"
+                        ))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.fieldErrors.email").exists());
     }
 
     @Test
-    void registrationWithShortPasswordReturnsValidationError() throws Exception {
+    void registrationWithShortPasswordReturnsValidationError()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + EMAIL + "\",\"password\":\"short\"}"))
+                        .content(
+                                "{\"email\":\"" + EMAIL
+                                        + "\",\"password\":\"short\"}"
+                        ))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.password").exists());
     }
@@ -102,6 +113,7 @@ class AuthIntegrationTest {
     void registrationWithPasswordExceedingUtf8ByteLimitReturnsValidationError()
             throws Exception {
 
+        // Each emoji occupies four UTF-8 bytes.
         // 24 emoji occupy 96 UTF-8 bytes but 48 UTF-16 code units.
         // This passes @Size(max = 72) but must fail @PasswordByteLength.
         String password = "😀".repeat(24);
@@ -110,7 +122,9 @@ class AuthIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.fieldErrors.password")
-                        .value("Password must not exceed 72 bytes when encoded as UTF-8"));
+                        .value(
+                                "Password must not exceed 72 bytes when encoded as UTF-8"
+                        ));
 
         assertThat(userRepository.findByEmail(EMAIL)).isEmpty();
     }
@@ -127,7 +141,9 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void registrationAndLoginWithDifferentEmailCaseSucceed() throws Exception {
+    void registrationAndLoginWithDifferentEmailCaseSucceed()
+            throws Exception {
+
         mockMvc.perform(register("Person@Example.com", PASSWORD))
                 .andExpect(status().isCreated());
 
@@ -148,8 +164,10 @@ class AuthIntegrationTest {
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + EMAIL
-                                + "\",\"password\":\"WrongPassword123\"}"))
+                        .content(
+                                "{\"email\":\"" + EMAIL
+                                        + "\",\"password\":\"WrongPassword123\"}"
+                        ))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
     }
@@ -162,18 +180,25 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void currentUserWithValidTokenReturnsAuthenticatedEmail() throws Exception {
+    void currentUserWithValidTokenReturnsAuthenticatedEmail()
+            throws Exception {
+
         mockMvc.perform(register(EMAIL, PASSWORD))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/v1/users/me")
-                        .header("Authorization", "Bearer " + login(EMAIL, PASSWORD)))
+                        .header(
+                                "Authorization",
+                                "Bearer " + login(EMAIL, PASSWORD)
+                        ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(EMAIL));
     }
 
     @Test
-    void currentUserWithInvalidTokenReturnsUnauthorized() throws Exception {
+    void currentUserWithInvalidTokenReturnsUnauthorized()
+            throws Exception {
+
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized())
@@ -211,6 +236,27 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void currentUserWithTokenForDeletedUserReturnsUnauthorized()
+            throws Exception {
+
+        // Register the user and obtain a valid JWT.
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        String token = login(EMAIL, PASSWORD);
+
+        // Delete the user after the token has been issued.
+        userRepository.deleteAll();
+        userRepository.flush();
+
+        // The token is validly signed, but the user no longer exists.
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
     void unexpectedUserLoadingFailureReturnsInternalServerError()
             throws Exception {
 
@@ -219,7 +265,9 @@ class AuthIntegrationTest {
 
         String token = login(EMAIL, PASSWORD);
 
-        doThrow(new IllegalStateException("Database temporarily unavailable"))
+        doThrow(
+                new IllegalStateException("Database temporarily unavailable")
+        )
                 .when(userDetailsService)
                 .loadUserByUsername(EMAIL);
 
@@ -239,8 +287,10 @@ class AuthIntegrationTest {
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/v1/does-not-exist")
-                        .header("Authorization",
-                                "Bearer " + login(EMAIL, PASSWORD)))
+                        .header(
+                                "Authorization",
+                                "Bearer " + login(EMAIL, PASSWORD)
+                        ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message")
@@ -253,15 +303,19 @@ class AuthIntegrationTest {
     ) {
         return post("/api/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"" + email
-                        + "\",\"password\":\"" + password + "\"}");
+                .content(
+                        "{\"email\":\"" + email
+                                + "\",\"password\":\"" + password + "\"}"
+                );
     }
 
     private String login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email
-                                + "\",\"password\":\"" + password + "\"}"))
+                        .content(
+                                "{\"email\":\"" + email
+                                        + "\",\"password\":\"" + password + "\"}"
+                        ))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andReturn();

@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -44,14 +45,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String token = authHeader.substring(7);
+
         final String email;
 
         try {
             email = jwtService.extractUsername(token);
         } catch (JwtException | IllegalArgumentException exception) {
-            // Invalid, malformed, expired, or incorrectly signed JWT.
-            // Continue without authentication. Protected endpoints will
-            // be rejected by Spring Security.
+            // Invalid, malformed, or expired JWTs remain unauthenticated.
             SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
             return;
@@ -60,17 +60,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (email != null
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            // Deliberately outside the JWT exception handler.
-            // Unexpected failures, including database errors, must propagate.
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(email);
+            final UserDetails userDetails;
+
+            try {
+                userDetails = userDetailsService.loadUserByUsername(email);
+            } catch (UsernameNotFoundException exception) {
+                // The token may be valid, but its user no longer exists.
+                // Treat the request as unauthenticated rather than as a server error.
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             if (jwtService.isTokenValid(token, userDetails)) {
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
 
                 authentication.setDetails(
                         new WebAuthenticationDetailsSource()
