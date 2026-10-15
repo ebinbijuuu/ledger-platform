@@ -1,0 +1,329 @@
+package com.ledger.platform;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledger.platform.repository.UserRepository;
+import com.ledger.platform.security.JwtService;
+import com.ledger.platform.service.CustomUserDetailsService;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class AuthIntegrationTest {
+
+    private static final String EMAIL = "person@example.com";
+    private static final String PASSWORD = "Password123";
+
+    private static final String TEST_JWT_SECRET =
+            "dGVzdC1qd3Qtc2VjcmV0LW11c3QtYmUtYXQtYmxvbmctMzItYnl0ZXMtbG9uZw==";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtService jwtService;
+
+    @SpyBean
+    private CustomUserDetailsService userDetailsService;
+
+    @BeforeEach
+    void clearUsers() {
+        reset(userDetailsService);
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void registerCreatesAnAccount() throws Exception {
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        assertThat(userRepository.findByEmail(EMAIL)).isPresent();
+    }
+
+    @Test
+    void duplicateRegistrationReturnsConflict() throws Exception {
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void registrationWithBlankEmailReturnsValidationError()
+            throws Exception {
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"email\":\"\",\"password\":\""
+                                        + PASSWORD + "\"}"
+                        ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.email").exists());
+    }
+
+    @Test
+    void registrationWithShortPasswordReturnsValidationError()
+            throws Exception {
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"email\":\"" + EMAIL
+                                        + "\",\"password\":\"short\"}"
+                        ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.password").exists());
+    }
+
+    @Test
+    void registrationWithPasswordExceedingUtf8ByteLimitReturnsValidationError()
+            throws Exception {
+
+        // Each emoji occupies four UTF-8 bytes.
+        // 24 emoji occupy 96 UTF-8 bytes but 48 UTF-16 code units.
+        // This passes @Size(max = 72) but must fail @PasswordByteLength.
+        String password = "😀".repeat(24);
+
+        mockMvc.perform(register(EMAIL, password))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.password")
+                        .value(
+                                "Password must not exceed 72 bytes when encoded as UTF-8"
+                        ));
+
+        assertThat(userRepository.findByEmail(EMAIL)).isEmpty();
+    }
+
+    @Test
+    void loginReturnsJwtForValidCredentials() throws Exception {
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        String token = login(EMAIL, PASSWORD);
+
+        assertThat(token).isNotBlank();
+        assertThat(jwtService.extractUsername(token)).isEqualTo(EMAIL);
+    }
+
+    @Test
+    void registrationAndLoginWithDifferentEmailCaseSucceed()
+            throws Exception {
+
+        mockMvc.perform(register("Person@Example.com", PASSWORD))
+                .andExpect(status().isCreated());
+
+        assertThat(userRepository.findByEmail("person@example.com"))
+                .isPresent();
+
+        String token = login("person@example.com", PASSWORD);
+
+        assertThat(token).isNotBlank();
+        assertThat(jwtService.extractUsername(token))
+                .isEqualTo("person@example.com");
+    }
+
+    @Test
+    void loginWithWrongPasswordReturnsUnauthorized() throws Exception {
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"email\":\"" + EMAIL
+                                        + "\",\"password\":\"WrongPassword123\"}"
+                        ))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void currentUserWithoutTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void currentUserWithValidTokenReturnsAuthenticatedEmail()
+            throws Exception {
+
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header(
+                                "Authorization",
+                                "Bearer " + login(EMAIL, PASSWORD)
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(EMAIL));
+    }
+
+    @Test
+    void currentUserWithInvalidTokenReturnsUnauthorized()
+            throws Exception {
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void malformedBearerHeaderReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "NotBearer sometoken"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void expiredTokenReturnsUnauthorized() throws Exception {
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        SecretKey key = Keys.hmacShaKeyFor(
+                Decoders.BASE64.decode(TEST_JWT_SECRET)
+        );
+
+        String expiredToken = Jwts.builder()
+                .subject(EMAIL)
+                .issuedAt(new Date(System.currentTimeMillis() - 10_000))
+                .expiration(new Date(System.currentTimeMillis() - 5_000))
+                .signWith(key)
+                .compact();
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void currentUserWithTokenForDeletedUserReturnsUnauthorized()
+            throws Exception {
+
+        // Register the user and obtain a valid JWT.
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        String token = login(EMAIL, PASSWORD);
+
+        // Delete the user after the token has been issued.
+        userRepository.deleteAll();
+        userRepository.flush();
+
+        // The token is validly signed, but the user no longer exists.
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void unexpectedUserLoadingFailureReturnsInternalServerError()
+            throws Exception {
+
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        String token = login(EMAIL, PASSWORD);
+
+        doThrow(
+                new IllegalStateException("Database temporarily unavailable")
+        )
+                .when(userDetailsService)
+                .loadUserByUsername(EMAIL);
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message")
+                        .value("An unexpected error occurred"));
+    }
+
+    @Test
+    void unknownProtectedEndpointWithValidTokenReturnsNotFound()
+            throws Exception {
+
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/does-not-exist")
+                        .header(
+                                "Authorization",
+                                "Bearer " + login(EMAIL, PASSWORD)
+                        ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message")
+                        .value("Resource not found"));
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder register(
+            String email,
+            String password
+    ) {
+        return post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        "{\"email\":\"" + email
+                                + "\",\"password\":\"" + password + "\"}"
+                );
+    }
+
+    private String login(String email, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"email\":\"" + email
+                                        + "\",\"password\":\"" + password + "\"}"
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(
+                result.getResponse().getContentAsString()
+        );
+
+        return response.get("token").asText();
+    }
+}

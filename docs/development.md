@@ -39,6 +39,12 @@ The example contains the shared PostgreSQL settings used by Docker Compose and S
 
 The committed `.env.example` contains development defaults only. Keep real credentials and local overrides in `.env`; Git ignores that file.
 
+Generate a JWT signing secret and paste it into `.env`:
+
+```bash
+openssl rand -base64 32
+```
+
 ## 4. Start PostgreSQL
 
 Start the development database from the repository root. Docker Compose reads `.env` automatically:

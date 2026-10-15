@@ -53,15 +53,18 @@ class GlobalExceptionHandlerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{bad json"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Request body is missing or malformed"));
+                .andExpect(jsonPath("$.message")
+                        .value("Request body is missing or malformed"));
     }
 
     @Test
     void methodParameterValidationIncludesParameterMessage() throws Exception {
-        mockMvc.perform(get("/api/v1/test/validated-parameter").param("count", "0"))
+        mockMvc.perform(get("/api/v1/test/validated-parameter")
+                        .param("count", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Request validation failed"))
-                .andExpect(jsonPath("$.fieldErrors.count").value("must be greater than or equal to 1"));
+                .andExpect(jsonPath("$.fieldErrors.count")
+                        .value("must be greater than or equal to 1"));
     }
 
     @Test
@@ -69,7 +72,8 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(put("/api/v1/test/validated"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.status").value(405))
-                .andExpect(jsonPath("$.message").value("HTTP method is not supported for this endpoint"));
+                .andExpect(jsonPath("$.message")
+                        .value("HTTP method is not supported for this endpoint"));
     }
 
     @Test
@@ -79,7 +83,8 @@ class GlobalExceptionHandlerTest {
                         .content("value"))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.status").value(415))
-                .andExpect(jsonPath("$.message").value("Content type is not supported"));
+                .andExpect(jsonPath("$.message")
+                        .value("Content type is not supported"));
     }
 
     @Test
@@ -97,14 +102,20 @@ class GlobalExceptionHandlerTest {
     void unexpectedFailureDoesNotExposeExceptionDetails() throws Exception {
         mockMvc.perform(get("/api/v1/test/unexpected"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.message")
+                        .value("An unexpected error occurred"))
                 .andExpect(jsonPath("$.trace").doesNotExist())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("sensitive internal detail"))));
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString(
+                                        "sensitive internal detail"
+                                )
+                        )));
     }
 
     @RestController
     static class ErrorTestController {
+
         @PostMapping("/api/v1/test/validated")
         String validated(@Valid @RequestBody TestRequest request) {
             return request.name();
@@ -115,14 +126,19 @@ class GlobalExceptionHandlerTest {
             return Integer.toString(count);
         }
 
-        @PostMapping(path = "/api/v1/test/consumes-json", consumes = MediaType.APPLICATION_JSON_VALUE)
+        @PostMapping(
+                path = "/api/v1/test/consumes-json",
+                consumes = MediaType.APPLICATION_JSON_VALUE
+        )
         String consumesJson(@RequestBody String body) {
             return body;
         }
 
         @GetMapping("/api/v1/test/missing")
         void missing() {
-            throw new ResourceNotFoundException("Test resource was not found");
+            throw new ResourceNotFoundException(
+                    "Test resource was not found"
+            );
         }
 
         @GetMapping("/api/v1/test/conflict")
@@ -132,7 +148,9 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/api/v1/test/unexpected")
         void unexpected() {
-            throw new IllegalStateException("sensitive internal detail");
+            throw new IllegalStateException(
+                    "sensitive internal detail"
+            );
         }
     }
 
