@@ -99,6 +99,23 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void registrationWithPasswordExceedingUtf8ByteLimitReturnsValidationError()
+            throws Exception {
+
+        // 24 emoji occupy 96 UTF-8 bytes but 48 UTF-16 code units.
+        // This passes @Size(max = 72) but must fail @PasswordByteLength.
+        String password = "😀".repeat(24);
+
+        mockMvc.perform(register(EMAIL, password))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.password")
+                        .value("Password must not exceed 72 bytes when encoded as UTF-8"));
+
+        assertThat(userRepository.findByEmail(EMAIL)).isEmpty();
+    }
+
+    @Test
     void loginReturnsJwtForValidCredentials() throws Exception {
         mockMvc.perform(register(EMAIL, PASSWORD))
                 .andExpect(status().isCreated());
@@ -110,13 +127,29 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void registrationAndLoginWithDifferentEmailCaseSucceed() throws Exception {
+        mockMvc.perform(register("Person@Example.com", PASSWORD))
+                .andExpect(status().isCreated());
+
+        assertThat(userRepository.findByEmail("person@example.com"))
+                .isPresent();
+
+        String token = login("person@example.com", PASSWORD);
+
+        assertThat(token).isNotBlank();
+        assertThat(jwtService.extractUsername(token))
+                .isEqualTo("person@example.com");
+    }
+
+    @Test
     void loginWithWrongPasswordReturnsUnauthorized() throws Exception {
         mockMvc.perform(register(EMAIL, PASSWORD))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + EMAIL + "\",\"password\":\"WrongPassword123\"}"))
+                        .content("{\"email\":\"" + EMAIL
+                                + "\",\"password\":\"WrongPassword123\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
     }
@@ -178,7 +211,9 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void unexpectedUserLoadingFailureReturnsInternalServerError() throws Exception {
+    void unexpectedUserLoadingFailureReturnsInternalServerError()
+            throws Exception {
+
         mockMvc.perform(register(EMAIL, PASSWORD))
                 .andExpect(status().isCreated());
 
@@ -197,15 +232,19 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void unknownProtectedEndpointWithValidTokenReturnsNotFound() throws Exception {
+    void unknownProtectedEndpointWithValidTokenReturnsNotFound()
+            throws Exception {
+
         mockMvc.perform(register(EMAIL, PASSWORD))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/v1/does-not-exist")
-                        .header("Authorization", "Bearer " + login(EMAIL, PASSWORD)))
+                        .header("Authorization",
+                                "Bearer " + login(EMAIL, PASSWORD)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.message").value("Resource not found"));
+                .andExpect(jsonPath("$.message")
+                        .value("Resource not found"));
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder register(
@@ -214,13 +253,15 @@ class AuthIntegrationTest {
     ) {
         return post("/api/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
+                .content("{\"email\":\"" + email
+                        + "\",\"password\":\"" + password + "\"}");
     }
 
     private String login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
+                        .content("{\"email\":\"" + email
+                                + "\",\"password\":\"" + password + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andReturn();
