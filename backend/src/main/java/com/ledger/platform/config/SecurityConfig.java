@@ -1,5 +1,7 @@
 package com.ledger.platform.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledger.platform.security.FilterChainExceptionHandler;
 import com.ledger.platform.security.JwtAuthenticationFilter;
 import com.ledger.platform.security.RestAccessDeniedHandler;
 import com.ledger.platform.security.RestAuthenticationEntryPoint;
@@ -18,19 +20,25 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final FilterChainExceptionHandler filterChainExceptionHandler;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
-            RestAccessDeniedHandler accessDeniedHandler
+            RestAccessDeniedHandler accessDeniedHandler,
+            ObjectMapper objectMapper
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.filterChainExceptionHandler =
+                new FilterChainExceptionHandler(objectMapper);
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http)
+            throws Exception {
+
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
@@ -48,6 +56,10 @@ public class SecurityConfig {
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        filterChainExceptionHandler,
+                        JwtAuthenticationFilter.class
                 );
 
         return http.build();

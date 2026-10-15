@@ -1,10 +1,12 @@
 package com.ledger.platform.security;
 
 import com.ledger.platform.service.CustomUserDetailsService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -42,32 +44,42 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String token = authHeader.substring(7);
+        final String email;
 
         try {
-            String email = jwtService.extractUsername(token);
+            email = jwtService.extractUsername(token);
+        } catch (JwtException | IllegalArgumentException exception) {
+            // Invalid, malformed, expired, or incorrectly signed JWT.
+            // Continue without authentication. Protected endpoints will
+            // be rejected by Spring Security.
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(email);
+        if (email != null
+                && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                if (jwtService.isTokenValid(token, userDetails)) {
-                    var authentication =
-                            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
+            // Deliberately outside the JWT exception handler.
+            // Unexpected failures, including database errors, must propagate.
+            UserDetails userDetails =
+                    userDetailsService.loadUserByUsername(email);
 
-                    authentication.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
+            if (jwtService.isTokenValid(token, userDetails)) {
+                var authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                );
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request)
+                );
+
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authentication);
             }
-
-        } catch (Exception ignored) {
-            // Invalid or expired JWTs are treated as unauthenticated requests.
         }
 
         filterChain.doFilter(request, response);

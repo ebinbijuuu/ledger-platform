@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledger.platform.repository.UserRepository;
 import com.ledger.platform.security.JwtService;
+import com.ledger.platform.service.CustomUserDetailsService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +23,8 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,7 +38,7 @@ class AuthIntegrationTest {
     private static final String EMAIL = "person@example.com";
     private static final String PASSWORD = "Password123";
     private static final String TEST_JWT_SECRET =
-            "dGVzdC1qd3Qtc2VjcmV0LW11c3QtYmUtYXQtbGVhc3QtMzItYnl0ZXMtbG9uZw==";
+            "dGVzdC1qd3Qtc2VjcmV0LW11c3QtYmUtYXQtYmxvbmctMzItYnl0ZXMtbG9uZw==";
 
     @Autowired
     private MockMvc mockMvc;
@@ -48,8 +52,12 @@ class AuthIntegrationTest {
     @Autowired
     private JwtService jwtService;
 
+    @SpyBean
+    private CustomUserDetailsService userDetailsService;
+
     @BeforeEach
     void clearUsers() {
+        reset(userDetailsService);
         userRepository.deleteAll();
     }
 
@@ -152,7 +160,9 @@ class AuthIntegrationTest {
         mockMvc.perform(register(EMAIL, PASSWORD))
                 .andExpect(status().isCreated());
 
-        SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(TEST_JWT_SECRET));
+        SecretKey key = Keys.hmacShaKeyFor(
+                Decoders.BASE64.decode(TEST_JWT_SECRET)
+        );
 
         String expiredToken = Jwts.builder()
                 .subject(EMAIL)
@@ -165,6 +175,25 @@ class AuthIntegrationTest {
                         .header("Authorization", "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void unexpectedUserLoadingFailureReturnsInternalServerError() throws Exception {
+        mockMvc.perform(register(EMAIL, PASSWORD))
+                .andExpect(status().isCreated());
+
+        String token = login(EMAIL, PASSWORD);
+
+        doThrow(new IllegalStateException("Database temporarily unavailable"))
+                .when(userDetailsService)
+                .loadUserByUsername(EMAIL);
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message")
+                        .value("An unexpected error occurred"));
     }
 
     @Test
@@ -181,7 +210,8 @@ class AuthIntegrationTest {
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder register(
             String email,
-            String password) {
+            String password
+    ) {
         return post("/api/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
@@ -195,7 +225,10 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andReturn();
 
-        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        JsonNode response = objectMapper.readTree(
+                result.getResponse().getContentAsString()
+        );
+
         return response.get("token").asText();
     }
 }
