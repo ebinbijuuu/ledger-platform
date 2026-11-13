@@ -145,7 +145,10 @@ Request body:
 }
 ```
 
-Returns `201 Created` with no body on success, or `409 Conflict` if the email is already registered.
+Returns `201 Created` with no body on success, `400 Bad Request` when the
+email or password is invalid, or `409 Conflict` if the email is already
+registered. Passwords must contain 8 to 72 characters and must not exceed
+72 bytes when encoded as UTF-8.
 
 ### Login
 
@@ -170,7 +173,10 @@ Returns `200 OK`:
 }
 ```
 
-Returns `401 Unauthorized` for an unknown email or incorrect password. Both cases return the same message and status, so a client cannot distinguish which one was wrong.
+Returns `400 Bad Request` when the request is malformed or its email or
+password is invalid. Returns `401 Unauthorized` for an unknown email or
+incorrect password. Both credential failures return the same message and
+status, so a client cannot distinguish which one was wrong.
 
 ### Using the token
 
