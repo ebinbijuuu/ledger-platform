@@ -11,6 +11,7 @@ import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
@@ -38,9 +39,6 @@ class AuthIntegrationTest {
     private static final String EMAIL = "person@example.com";
     private static final String PASSWORD = "Password123";
 
-    private static final String TEST_JWT_SECRET =
-            "dGVzdC1qd3Qtc2VjcmV0LW11c3QtYmUtYXQtYmxvbmctMzItYnl0ZXMtbG9uZw==";
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -52,6 +50,9 @@ class AuthIntegrationTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Value("${JWT_SECRET}")
+    private String testJwtSecret;
 
     @SpyBean
     private CustomUserDetailsService userDetailsService;
@@ -219,7 +220,7 @@ class AuthIntegrationTest {
                 .andExpect(status().isCreated());
 
         SecretKey key = Keys.hmacShaKeyFor(
-                Decoders.BASE64.decode(TEST_JWT_SECRET)
+                Decoders.BASE64.decode(testJwtSecret)
         );
 
         String expiredToken = Jwts.builder()
