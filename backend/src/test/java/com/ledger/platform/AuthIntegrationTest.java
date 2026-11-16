@@ -2,6 +2,7 @@ package com.ledger.platform;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledger.platform.repository.AccountRepository;
 import com.ledger.platform.repository.UserRepository;
 import com.ledger.platform.security.JwtService;
 import com.ledger.platform.service.CustomUserDetailsService;
@@ -49,6 +50,9 @@ class AuthIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
     private JwtService jwtService;
 
     @Value("${JWT_SECRET}")
@@ -60,6 +64,7 @@ class AuthIntegrationTest {
     @BeforeEach
     void clearUsers() {
         reset(userDetailsService);
+        accountRepository.deleteAll();
         userRepository.deleteAll();
     }
 

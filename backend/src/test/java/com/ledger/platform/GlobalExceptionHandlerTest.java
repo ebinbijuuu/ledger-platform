@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -99,6 +100,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void invalidPathVariableTypeUsesSharedValidationError() throws Exception {
+        mockMvc.perform(get("/api/v1/test/uuid/not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.fieldErrors.id").value("Invalid value"));
+    }
+
+    @Test
     void unexpectedFailureDoesNotExposeExceptionDetails() throws Exception {
         mockMvc.perform(get("/api/v1/test/unexpected"))
                 .andExpect(status().isInternalServerError())
@@ -151,6 +161,11 @@ class GlobalExceptionHandlerTest {
             throw new IllegalStateException(
                     "sensitive internal detail"
             );
+        }
+
+        @GetMapping("/api/v1/test/uuid/{id}")
+        String uuid(@PathVariable java.util.UUID id) {
+            return id.toString();
         }
     }
 

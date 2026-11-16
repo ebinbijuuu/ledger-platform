@@ -59,18 +59,28 @@ updated_at
 
 Represents a financial account belonging to a user.
 
-Potential fields:
+Each account has a required foreign key to one user. The account API derives
+the owner from the authenticated user's email and never accepts an owner from
+a client request.
+
+Fields implemented by the account domain:
 
 ```text
 id
 user_id
 account_number
-account_type
 currency
 status
 created_at
 updated_at
 ```
+
+`id` is a UUID. `user_id` references `users.id`. `account_number` is 8–34
+uppercase ASCII letters or digits and is globally unique. `currency` is a
+supported uppercase ISO 4217 code. Status is one of `ACTIVE`, `FROZEN`, or
+`CLOSED`. These account API endpoints do not store a monetary balance; future
+balances should follow the ledger design below rather than introduce a
+floating-point value on the account row.
 
 ### Transaction
 
@@ -227,6 +237,7 @@ Important constraints will include:
 - Positive monetary amounts where appropriate
 - Valid transaction statuses
 - Valid account statuses
+- Unique account numbers and non-null account ownership
 
 Additional constraints will be added as the domain is implemented.
 
