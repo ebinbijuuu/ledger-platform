@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -91,6 +92,18 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Required request parameter is missing", request,
                 Map.of(exception.getParameterName(), "Required parameter is missing"));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "Request validation failed",
+                request,
+                Map.of(exception.getName(), "Invalid value")
+        );
     }
 
     @ExceptionHandler(Exception.class)

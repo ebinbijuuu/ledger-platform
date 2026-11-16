@@ -134,7 +134,39 @@ Authentication and authorisation will be implemented using Spring Security.
 
 The final authentication mechanism will be documented when implemented.
 
-## 10. Financial Operations
+## 10. Accounts
+
+Account endpoints require authentication. Account ownership is derived from
+the authenticated principal; clients cannot choose or override the owner.
+
+### List the caller's accounts
+
+```text
+GET /api/v1/accounts
+```
+
+Returns `200 OK` with an array of the authenticated user's accounts. The array
+is empty when the user has no accounts. Each item includes its UUID, account
+number, currency, status, and creation/update timestamps.
+
+### Retrieve one of the caller's accounts
+
+```text
+GET /api/v1/accounts/{accountId}
+```
+
+Returns `200 OK` with the account details when the account belongs to the
+authenticated user. A missing account or another user's account returns the
+same `404 Not Found` response to avoid revealing whether another account
+exists. A malformed UUID returns `400 Bad Request` through the shared error
+contract.
+
+Account numbers use 8–34 uppercase letters or digits. Currency must be a
+supported ISO 4217 code, and status is `ACTIVE`, `FROZEN`, or `CLOSED`.
+Accounts are provisioned by the domain; this read-focused API does not expose
+an account-creation endpoint.
+
+## 11. Financial Operations
 
 Financial endpoints must follow additional rules:
 
@@ -145,7 +177,7 @@ Financial endpoints must follow additional rules:
 - Duplicate requests must be prevented where necessary
 - Appropriate audit information must be recorded
 
-## 11. Idempotency
+## 12. Idempotency
 
 Financial operations such as transfers should support idempotency.
 
@@ -159,7 +191,7 @@ Idempotency-Key: 8b7d3c2a-example
 
 The exact implementation will be defined when transfer functionality is developed.
 
-## 12. Pagination
+## 13. Pagination
 
 Endpoints returning potentially large collections should support pagination.
 
@@ -171,7 +203,7 @@ GET /api/v1/transactions?page=0&size=20
 
 The final pagination response structure will be defined during implementation.
 
-## 13. API Documentation
+## 14. API Documentation
 
 As the API grows, endpoint documentation will be maintained using OpenAPI/Swagger.
 
