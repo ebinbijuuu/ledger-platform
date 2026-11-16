@@ -59,15 +59,15 @@ updated_at
 
 Represents a financial account belonging to a user.
 
-Account records use the authenticated principal's subject as `owner_subject`.
-The account API always filters by that value; it never accepts an owner from a
-client request. The identity model is supplied by the authentication domain.
+Each account has a required foreign key to one user. The account API derives
+the owner from the authenticated user's email and never accepts an owner from
+a client request.
 
 Fields implemented by the account domain:
 
 ```text
 id
-owner_subject
+user_id
 account_number
 currency
 status
@@ -75,11 +75,12 @@ created_at
 updated_at
 ```
 
-`id` is a UUID. `account_number` is 8–34 uppercase ASCII letters or digits and
-is globally unique. `currency` is a supported uppercase ISO 4217 code. Status
-is one of `ACTIVE`, `FROZEN`, or `CLOSED`. These account API endpoints do not
-store a monetary balance; future balances should follow the ledger design
-below rather than introduce a floating-point value on the account row.
+`id` is a UUID. `user_id` references `users.id`. `account_number` is 8–34
+uppercase ASCII letters or digits and is globally unique. `currency` is a
+supported uppercase ISO 4217 code. Status is one of `ACTIVE`, `FROZEN`, or
+`CLOSED`. These account API endpoints do not store a monetary balance; future
+balances should follow the ledger design below rather than introduce a
+floating-point value on the account row.
 
 ### Transaction
 

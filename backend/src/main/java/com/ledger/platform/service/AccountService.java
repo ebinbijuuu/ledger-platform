@@ -19,15 +19,15 @@ public class AccountService {
         this.accountRepository = accountRepository;
     }
 
-    public List<AccountResponse> getAccountsFor(String ownerSubject) {
-        return accountRepository.findAllByOwnerSubjectOrderByCreatedAtDesc(ownerSubject)
+    public List<AccountResponse> getAccountsFor(String ownerEmail) {
+        return accountRepository.findAllByOwner_EmailOrderByCreatedAtDesc(ownerEmail)
                 .stream()
                 .map(AccountResponse::from)
                 .toList();
     }
 
-    public AccountResponse getAccountFor(UUID accountId, String ownerSubject) {
-        return accountRepository.findByIdAndOwnerSubject(accountId, ownerSubject)
+    public AccountResponse getAccountFor(UUID accountId, String ownerEmail) {
+        return accountRepository.findByIdAndOwner_Email(accountId, ownerEmail)
                 .map(AccountResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
     }

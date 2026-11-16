@@ -4,7 +4,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -26,8 +29,9 @@ public class Account {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "owner_subject", nullable = false, length = 255)
-    private String ownerSubject;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User owner;
 
     @Column(name = "account_number", nullable = false, unique = true, length = 34)
     private String accountNumber;
@@ -51,13 +55,13 @@ public class Account {
 
     private Account(
             UUID id,
-            String ownerSubject,
+            User owner,
             String accountNumber,
             String currency,
             AccountStatus status
     ) {
         this.id = id;
-        this.ownerSubject = validateOwnerSubject(ownerSubject);
+        this.owner = Objects.requireNonNull(owner, "Account owner is required");
         this.accountNumber = validateAccountNumber(accountNumber);
         this.currency = validateCurrency(currency);
         this.status = Objects.requireNonNull(status, "Account status is required");
@@ -65,14 +69,14 @@ public class Account {
 
     /** Creates an account after validating values that must be valid in every domain entry point. */
     public static Account open(
-            String ownerSubject,
+            User owner,
             String accountNumber,
             String currency,
             AccountStatus status
     ) {
         return new Account(
                 UUID.randomUUID(),
-                ownerSubject,
+                owner,
                 accountNumber,
                 currency,
                 status
@@ -89,13 +93,6 @@ public class Account {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
-    }
-
-    private static String validateOwnerSubject(String ownerSubject) {
-        if (ownerSubject == null || ownerSubject.isBlank() || ownerSubject.length() > 255) {
-            throw new IllegalArgumentException("Account owner is required");
-        }
-        return ownerSubject;
     }
 
     private static String validateAccountNumber(String accountNumber) {
@@ -123,8 +120,8 @@ public class Account {
         return id;
     }
 
-    public String getOwnerSubject() {
-        return ownerSubject;
+    public User getOwner() {
+        return owner;
     }
 
     public String getAccountNumber() {

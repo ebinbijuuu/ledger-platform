@@ -2,7 +2,9 @@ package com.ledger.platform;
 
 import com.ledger.platform.entity.Account;
 import com.ledger.platform.entity.AccountStatus;
+import com.ledger.platform.entity.User;
 import com.ledger.platform.repository.AccountRepository;
+import com.ledger.platform.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,19 +35,25 @@ class AccountApiIntegrationTest {
     @Autowired
     private AccountRepository accountRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     private Account aliceAccount;
 
     @BeforeEach
     void setUp() {
         accountRepository.deleteAll();
+        userRepository.deleteAll();
+        User alice = userRepository.save(createUser(ALICE));
+        User bob = userRepository.save(createUser(BOB));
         aliceAccount = accountRepository.saveAndFlush(
-                Account.open(ALICE, "ALICE000000000001", "GBP", AccountStatus.ACTIVE)
+                Account.open(alice, "ALICE000000000001", "GBP", AccountStatus.ACTIVE)
         );
         accountRepository.saveAndFlush(
-                Account.open(ALICE, "ALICE000000000002", "EUR", AccountStatus.FROZEN)
+                Account.open(alice, "ALICE000000000002", "EUR", AccountStatus.FROZEN)
         );
         accountRepository.saveAndFlush(
-                Account.open(BOB, "BOB00000000000001", "USD", AccountStatus.CLOSED)
+                Account.open(bob, "BOB00000000000001", "USD", AccountStatus.CLOSED)
         );
     }
 
@@ -59,7 +67,7 @@ class AccountApiIntegrationTest {
                         "ALICE000000000002"
                 )))
                 .andExpect(jsonPath("$[2]").doesNotExist())
-                .andExpect(jsonPath("$[0].ownerSubject").doesNotExist());
+                .andExpect(jsonPath("$[0].owner").doesNotExist());
     }
 
     @Test
@@ -121,7 +129,15 @@ class AccountApiIntegrationTest {
     @Test
     void accountNumberMustBeUniqueAcrossOwners() {
         assertThatThrownBy(() -> accountRepository.saveAndFlush(
-                Account.open(BOB, "ALICE000000000001", "GBP", AccountStatus.ACTIVE)
+                Account.open(userRepository.findByEmail(BOB).orElseThrow(),
+                        "ALICE000000000001", "GBP", AccountStatus.ACTIVE)
         )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private User createUser(String email) {
+        User user = new User();
+        user.setEmail(email);
+        user.setPasswordHash("test-hash");
+        return user;
     }
 }

@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface AccountRepository extends JpaRepository<Account, UUID> {
 
-    List<Account> findAllByOwnerSubjectOrderByCreatedAtDesc(String ownerSubject);
+    List<Account> findAllByOwner_EmailOrderByCreatedAtDesc(String ownerEmail);
 
-    Optional<Account> findByIdAndOwnerSubject(UUID id, String ownerSubject);
+    Optional<Account> findByIdAndOwner_Email(UUID id, String ownerEmail);
 }
